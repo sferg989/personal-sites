@@ -1,0 +1,56 @@
+---
+import BlogPost from '../../layouts/BlogPost.astro'
+
+// import { Debug } from 'astro/components';
+import { GraphQLClient } from '../../util/graphQLClient'
+import type { Page } from '../../types/page'
+
+const client = GraphQLClient.Instance()
+
+export function getStaticPaths() {
+  return [
+    { params: { slug: 'hygraph-works-with-any-framework' } },
+    { params: { slug: 'any-framework-will-work' } },
+    { params: { slug: 'implementation-guides' } }
+  ]
+}
+const { slug } = Astro.params
+
+type PageResponse = {
+  page: Page
+}
+
+const { page }: PageResponse = await client.request(
+  `
+  query Page($slug: String!) {
+    page(where: { slug: $slug }) {
+      title
+      slug
+      publishedAt
+      updatedAt
+      heroImage {
+        id
+        url
+        mimeType
+      }
+      body {
+        html
+      }
+    }
+  }
+  `,
+  {
+    slug
+  }
+)
+---
+
+<BlogPost {...page}>
+  <div class='m-12'>
+    <div set:html={page.body.html} class='mb-8 text-lg' />
+
+    <p>
+      <a href='/' class='underline'>Back to homepage</a>
+    </p>
+  </div>
+</BlogPost>

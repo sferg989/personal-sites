@@ -1,0 +1,108 @@
+---
+import BaseHead from '../components/BaseHead.astro'
+import Header from '../components/Header.astro'
+import Footer from '../components/Footer.astro'
+import { SITE_TITLE, SITE_DESCRIPTION } from '../consts'
+import { GraphQLClient } from '../util/graphQLClient'
+import type { Page, Pages } from '../types/page'
+import { optimizeImages } from '../util/optimizeImages'
+import Picture from '../components/Picture.astro'
+
+const client = GraphQLClient.Instance()
+
+// Fetch the homepage data
+const { page }: { page: Page } = await client.request(`
+  query HomePage {
+    page(where: { slug: "homepage" }) {
+      title
+      slug
+      publishedAt
+      updatedAt
+      heroImage {
+        id
+        url
+        mimeType
+        width
+        height
+      }
+      body {
+        html
+      }
+      metaDescription
+      keywords
+    }
+  }
+`)
+
+if (page && page.body && page.body.html) {
+  page.body.html = await optimizeImages(page.body.html)
+}
+
+// Fetch all pages for navigation, excluding the homepage
+const { pages }: Pages = await client.request(`
+  query AllPages {
+    pages(where: { slug_not: "homepage" }) {
+      title
+      slug
+    }
+  }
+`)
+
+const pageTitle = page ? `${page.title} | ${SITE_TITLE}` : SITE_TITLE
+const pageDescription = page?.metaDescription || SITE_DESCRIPTION
+---
+
+<!doctype html>
+<html lang='en'>
+  <head>
+    <BaseHead
+      title={pageTitle}
+      description={pageDescription}
+      image={page?.heroImage?.url}
+      keywords={page?.keywords}
+    />
+    <link rel='canonical' href={new URL(Astro.url.pathname, 'https://mollyferguson.info')} />
+  </head>
+  <body>
+    <Header />
+    <main>
+      {
+        page ? (
+          <article>
+            {page.heroImage && (
+              <div class='hero-image'>
+                {page.heroImage.mimeType === 'video/mp4' ? (
+                  <video controls>
+                    <source src={page.heroImage.url} type='video/mp4' />
+                    Your browser does not support the video tag.
+                  </video>
+                ) : (
+                  <Picture src={page.heroImage.url} alt={page.title} />
+                )}
+              </div>
+            )}
+            <div set:html={page.body.html} />
+          </article>
+        ) : (
+          <p>Homepage content not found.</p>
+        )
+      }
+
+      {
+        pages.length > 0 && (
+          <nav aria-label='Other pages'>
+            <h2>Other Pages</h2>
+            <ul>
+              {pages.map((page) => (
+                <li>
+                  <a href={`/page/${page.slug}`}>{page.title}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )
+      }
+    </main>
+    <Footer />
+  </body>
+</html>
